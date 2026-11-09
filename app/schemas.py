@@ -18,9 +18,20 @@
 
 from pydantic import BaseModel
 from typing import Literal
+from datetime import datetime
+from pydantic import ConfigDict
 
 class Auth(BaseModel):
     service: str
     level: Literal["INFO", "WARNING", "ERROR", "CRITICAL"]
     message: str
     status_code: int | None
+
+class EventResponse(BaseModel):
+    id: int
+    service: str
+    level: Literal["INFO", "WARNING", "ERROR", "CRITICAL"]
+    message: str
+    status_code: int | None
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
