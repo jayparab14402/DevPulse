@@ -11,7 +11,7 @@ app = FastAPI()
 @app.get("/health")
 def health_check():
     return {
-        "OK"
+        "message": "Hello World"
     }
 
 @app.post("/events", response_model = EventResponse, status_code = 201)
