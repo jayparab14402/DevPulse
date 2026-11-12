@@ -45,11 +45,6 @@ def add_record(db, data):
             
 
 
-# if __name__=="__main__":
-#     # add_record(get_db)
-#     fetch_data(get_db)
-
-
 
 
 

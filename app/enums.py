@@ -8,3 +8,7 @@ class ErrorLevel(str, enum.Enum):
     WARNING = "WARNING"
     ERROR = "ERROR"
     CRITICAL = "CRITICAL"
+
+class MonitorStatus(str, enum.Enum):
+    UP = "UP"
+    DOWN = "DOWN"

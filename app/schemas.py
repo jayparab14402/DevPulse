@@ -35,3 +35,35 @@ class EventResponse(BaseModel):
     status_code: int | None
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+class MonitorCreate(BaseModel):
+  name: str
+  url: str
+  method: str = "GET"
+  expected_status: int = 200
+  timeout_seconds: float = 5
+
+
+class MonitorResponse(BaseModel):
+    id: int
+    name: str
+    url: str
+    method: str
+    expected_status: int
+    timeout_seconds: float
+    enabled: bool
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class MonitorCheckResponse(BaseModel):
+  id: int
+  monitor_id: int
+  status: str
+  http_status: int | None
+  latency_ms: float | None
+  error_message: str | None
+  checked_at: datetime
+
+  model_config = ConfigDict(from_attributes=True)
