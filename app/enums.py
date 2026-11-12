@@ -12,3 +12,14 @@ class ErrorLevel(str, enum.Enum):
 class MonitorStatus(str, enum.Enum):
     UP = "UP"
     DOWN = "DOWN"
+
+class IncidentStatus(str, enum.Enum):
+    OPEN = "OPEN"
+    RESOLVED = "RESOLVED"
+
+
+class IncidentSeverity(str, enum.Enum):
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"

@@ -15,7 +15,12 @@ from sqlalchemy import (
 
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
-from .enums import ErrorLevel, MonitorStatus
+from .enums import (
+    ErrorLevel,
+    MonitorStatus,
+    IncidentStatus,
+    IncidentSeverity,
+)
 
 
 class Base(DeclarativeBase):
@@ -108,6 +113,9 @@ class Monitor(Base):
         back_populates="monitor"
     )
 
+    incidents: Mapped[list["Incident"]] = relationship(
+    back_populates="monitor"
+)
 
 class MonitorCheck(Base):
     __tablename__ = "monitor_checks"
@@ -151,4 +159,59 @@ class MonitorCheck(Base):
 
     monitor: Mapped["Monitor"] = relationship(
         back_populates="checks"
+    )
+
+
+class Incident(Base):
+    __tablename__ = "incidents"
+
+    id: Mapped[int] = mapped_column(
+        Integer,
+        Identity(always=False),
+        primary_key=True
+    )
+
+    monitor_id: Mapped[int] = mapped_column(
+        ForeignKey("monitors.id"),
+        nullable=False
+    )
+
+    status: Mapped[IncidentStatus] = mapped_column(
+        Enum(IncidentStatus, name="incident_status"),
+        nullable=False,
+        default=IncidentStatus.OPEN
+    )
+
+    severity: Mapped[IncidentSeverity] = mapped_column(
+        Enum(IncidentSeverity, name="incident_severity"),
+        nullable=False,
+        default=IncidentSeverity.HIGH
+    )
+
+    failure_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False
+    )
+
+    first_seen: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        server_default=func.current_timestamp(),
+        nullable=False
+    )
+
+    last_seen: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        server_default=func.current_timestamp(),
+        nullable=False
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
+        server_default=func.current_timestamp(),
+        nullable=False
+    )
+
+    resolved_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=True
     )
