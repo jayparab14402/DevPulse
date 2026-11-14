@@ -1,11 +1,12 @@
 from fastapi import FastAPI, Depends
 from sqlalchemy.orm import Session
-from .schemas import Auth, EventResponse, MonitorCreate, MonitorResponse, MonitorCheckResponse
+from .schemas import Auth, EventResponse, MonitorCreate, MonitorResponse, MonitorCheckResponse, IncidentResponse
 from .database import get_db
 from .utils import add_record, fetch_data
 from traceback import format_exc
 from .services.monitor_service import create_monitior_service
 from .services.monitor_api_service import call_monitor_api_service
+from .services.incident_service import incident_query
 
 
 app = FastAPI()
@@ -47,3 +48,8 @@ def monitor_api_check(monitor_id: int, session: Session = Depends(get_db)):
         return resp
     except Exception as e:
         print(e)
+
+@app.get("/incidents") # , response_model=IncidentResponse
+def get_incidents(db: Session = Depends(get_db)):
+    print("@@@@@@@@@@@@", incident_query(db))
+    return incident_query(db)

@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from typing import Literal
 from datetime import datetime
 from pydantic import ConfigDict
+from .enums import IncidentStatus, IncidentSeverity
 
 class Auth(BaseModel):
     service: str
@@ -67,3 +68,16 @@ class MonitorCheckResponse(BaseModel):
   checked_at: datetime
 
   model_config = ConfigDict(from_attributes=True)
+
+class IncidentResponse(BaseModel):
+    id: int
+    monitor_id: int
+    status: IncidentStatus
+    severity: IncidentSeverity
+    failure_count: int
+    first_seen: datetime
+    last_seen: datetime
+    created_at: datetime
+    resolved_at: datetime | None
+
+    model_config = ConfigDict(from_attributes=True)

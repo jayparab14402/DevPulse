@@ -215,3 +215,8 @@ class Incident(Base):
         TIMESTAMP(timezone=True),
         nullable=True
     )
+
+    monitor: Mapped["Monitor"] = relationship(
+        back_populates="incidents"
+    )
+
