@@ -67,5 +67,10 @@ class IncidentResponse(BaseModel):
     last_seen: datetime
     created_at: datetime
     resolved_at: datetime | None
+    jira_issue_key: str | None
+    jira_issue_url: str | None
+    jira_sync_status: str
+    jira_last_error: str | None
+    jira_synced_at: datetime | None
 
     model_config = ConfigDict(from_attributes=True)

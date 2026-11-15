@@ -7,7 +7,8 @@ from sqlalchemy import select
 from ..enums import MonitorStatus
 from ..models import Monitor, MonitorCheck
 from ..redis_client import register_failure
-from .incident_service import handle_incident
+from .incident_service import handle_incident, save_jira_result
+from .jira_service import create_jira_issue
 from .slack_service import send_incident_alert
 
 
@@ -30,6 +31,8 @@ def _process_failure(session, check: MonitorCheck) -> None:
     )
     if created:
         send_incident_alert(incident)
+        jira_result = create_jira_issue(incident)
+        save_jira_result(session, incident, jira_result)
 
 
 def call_monitor_api_service(session, monitor_id: int) -> MonitorCheck:

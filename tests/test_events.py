@@ -1,3 +1,5 @@
+import os
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
@@ -9,9 +11,10 @@ from sqlalchemy.pool import StaticPool
 
 from app.database import get_db
 from app.main import app
-from app.models import Base, Incident, Monitor, MonitorCheck
+from app.models import Base, Monitor
 from app.redis_client import register_failure
 from app.services import scheduler_service
+from app.services.jira_service import create_jira_issue
 
 
 engine = create_engine(
@@ -134,6 +137,15 @@ def test_failure_lifecycle_and_resolve():
         patch(
             "app.services.monitor_api_service.send_incident_alert"
         ) as send_alert,
+        patch(
+            "app.services.monitor_api_service.create_jira_issue",
+            return_value={
+                "status": "CREATED",
+                "issue_key": "KAN-1",
+                "issue_url": "https://example.atlassian.net/browse/KAN-1",
+                "error": None,
+            },
+        ) as create_jira,
     ):
         first = client.post(f"/monitor/{monitor['id']}/check")
         assert first.json()["status"] == "DOWN"
@@ -149,6 +161,8 @@ def test_failure_lifecycle_and_resolve():
         incident_id = incidents[0]["id"]
         assert incidents[0]["failure_count"] == 3
         assert incidents[0]["status"] == "OPEN"
+        assert incidents[0]["jira_issue_key"] == "KAN-1"
+        assert incidents[0]["jira_sync_status"] == "CREATED"
 
         fourth = client.post(f"/monitor/{monitor['id']}/check")
         incidents = client.get("/incidents").json()
@@ -157,11 +171,15 @@ def test_failure_lifecycle_and_resolve():
         assert incidents[0]["failure_count"] == 4
 
         send_alert.assert_called_once()
+        create_jira.assert_called_once()
 
-    resolved = client.patch(f"/incidents/{incident_id}/resolve")
+    with patch("app.main.clear_failures") as clear_failures:
+        resolved = client.patch(f"/incidents/{incident_id}/resolve")
+
     assert resolved.status_code == 200
     assert resolved.json()["status"] == "RESOLVED"
     assert resolved.json()["resolved_at"] is not None
+    clear_failures.assert_called_once_with(monitor["id"])
 
     already_resolved = client.patch(f"/incidents/{incident_id}/resolve")
     assert already_resolved.status_code == 404
@@ -181,6 +199,52 @@ def test_redis_ttl_is_set_only_for_first_failure():
         assert register_failure(7) == 2
 
     redis_mock.expire.assert_called_once_with("monitor:7:failures", 300)
+
+
+def test_jira_integration_is_disabled_by_default():
+    incident = SimpleNamespace(id=10, monitor_id=7)
+
+    with (
+        patch.dict(os.environ, {"JIRA_INTEGRATION_ENABLED": "false"}),
+        patch("app.services.jira_service.requests.post") as jira_post,
+    ):
+        result = create_jira_issue(incident)
+
+    assert result["status"] == "DISABLED"
+    jira_post.assert_not_called()
+
+
+def test_jira_issue_creation_uses_one_request():
+    incident = SimpleNamespace(id=10, monitor_id=7)
+    jira_response = Mock()
+    jira_response.json.return_value = {"key": "KAN-25"}
+
+    jira_environment = {
+        "JIRA_INTEGRATION_ENABLED": "true",
+        "JIRA_BASE_URL": "https://example.atlassian.net",
+        "JIRA_EMAIL": "developer@example.com",
+        "JIRA_API_TOKEN": "test-token",
+        "JIRA_PROJECT_KEY": "KAN",
+        "JIRA_ISSUE_TYPE": "Task",
+    }
+
+    with (
+        patch.dict(os.environ, jira_environment),
+        patch(
+            "app.services.jira_service.requests.post",
+            return_value=jira_response,
+        ) as jira_post,
+    ):
+        result = create_jira_issue(incident)
+
+    assert result["status"] == "CREATED"
+    assert result["issue_key"] == "KAN-25"
+    assert result["issue_url"] == "https://example.atlassian.net/browse/KAN-25"
+    jira_post.assert_called_once()
+
+    request_payload = jira_post.call_args.kwargs["json"]
+    assert request_payload["fields"]["project"]["key"] == "KAN"
+    assert "devpulse-incident-10" in request_payload["fields"]["labels"]
 
 
 def test_scheduler_checks_only_enabled_monitors():

@@ -216,6 +216,33 @@ class Incident(Base):
         nullable=True
     )
 
+    jira_issue_key: Mapped[str | None] = mapped_column(
+        String(50),
+        unique=True,
+        nullable=True
+    )
+
+    jira_issue_url: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
+    )
+
+    jira_sync_status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="NOT_REQUESTED"
+    )
+
+    jira_last_error: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
+    )
+
+    jira_synced_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True),
+        nullable=True
+    )
+
     monitor: Mapped["Monitor"] = relationship(
         back_populates="incidents"
     )

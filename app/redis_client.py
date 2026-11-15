@@ -32,3 +32,13 @@ def register_failure(monitor_id: int) -> int | None:
     except redis.RedisError as exc:
         print(f"Redis error while registering monitor failure: {exc}")
         return None
+
+
+def clear_failures(monitor_id: int) -> bool:
+    """Start a fresh failure window after an incident is resolved."""
+    try:
+        redis_client.delete(failure_key(monitor_id))
+        return True
+    except redis.RedisError as exc:
+        print(f"Redis error while clearing monitor failures: {exc}")
+        return False

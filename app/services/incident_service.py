@@ -60,3 +60,15 @@ def resolve_incident(session, incident_id: int):
     session.commit()
     session.refresh(incident)
     return incident
+
+
+def save_jira_result(session, incident, jira_result):
+    incident.jira_sync_status = jira_result["status"]
+    incident.jira_issue_key = jira_result.get("issue_key")
+    incident.jira_issue_url = jira_result.get("issue_url")
+    incident.jira_last_error = jira_result.get("error")
+    incident.jira_synced_at = jira_result.get("synced_at")
+
+    session.commit()
+    session.refresh(incident)
+    return incident

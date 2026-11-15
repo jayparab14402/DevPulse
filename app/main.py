@@ -4,6 +4,7 @@ from fastapi import Depends, FastAPI, HTTPException
 from sqlalchemy.orm import Session
 
 from .database import get_db
+from .redis_client import clear_failures
 from .schemas import (
     Auth,
     EventResponse,
@@ -73,4 +74,5 @@ def resolve_incident_api(
     incident = resolve_incident(db, incident_id)
     if incident is None:
         raise HTTPException(status_code=404, detail="Open incident not found")
+    clear_failures(incident.monitor_id)
     return incident

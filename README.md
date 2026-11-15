@@ -2,7 +2,7 @@
 
 DevPulse is a backend-focused API reliability and incident-monitoring service built with FastAPI, PostgreSQL, Redis, SQLAlchemy, Alembic, APScheduler, and Docker Compose.
 
-It registers safe/read-only service endpoints, stores health-check history and latency, tracks repeated failures in a five-minute Redis window, creates one incident per ongoing outage, and can notify Slack when a new incident opens.
+It registers safe/read-only service endpoints, stores health-check history and latency, tracks repeated failures in a five-minute Redis window, creates one incident per ongoing outage, and can notify Slack or create one Jira issue when a new incident opens.
 
 ## How it works
 
@@ -17,7 +17,7 @@ MonitorCheck stored in PostgreSQL
       |
 DOWN -> Redis failure counter (5-minute TTL)
       |
-3 failures -> create OPEN incident -> Slack alert
+3 failures -> create OPEN incident -> Slack alert / Jira issue
 4+ failures -> update the same OPEN incident
       |
 Manual resolve API
@@ -55,6 +55,12 @@ POSTGRES_PASSWORD=change-me
 POSTGRES_DB=devpulse
 MONITOR_INTERVAL_SECONDS=60
 SLACK_WEBHOOK_URL=
+JIRA_INTEGRATION_ENABLED=false
+JIRA_BASE_URL=
+JIRA_EMAIL=
+JIRA_API_TOKEN=
+JIRA_PROJECT_KEY=KAN
+JIRA_ISSUE_TYPE=Task
 ```
 
 Then start the stack:
@@ -118,9 +124,19 @@ Redis uses the key `monitor:{id}:failures`.
 - Failure 3 creates one open incident.
 - Failure 4 and later update that same open incident.
 - Slack is called only when the incident is first created.
+- Jira is called only when the incident is first created and the integration is enabled.
 - After an incident is resolved, a later qualifying failure window can create a new incident.
+- Resolving an incident clears that monitor's Redis counter, so a later incident requires three fresh failures.
 
-If Redis or Slack is temporarily unavailable, the monitor check remains stored in PostgreSQL. Slack delivery is best-effort and does not roll back incident creation.
+If Redis, Slack, or Jira is temporarily unavailable, the monitor check and incident remain stored in PostgreSQL. External notifications do not roll back incident creation.
+
+## Jira integration
+
+Jira creation is disabled by default so local checks and automated tests cannot consume Jira work items. To enable it, create a Jira API token and provide all Jira environment variables in the local `.env` file. Never commit the token.
+
+The integration creates one Jira issue only when a new incident is inserted. Later failures update the same incident and do not call Jira again. DevPulse stores the Jira key, URL, synchronization status, and a sanitized error on the incident.
+
+There is intentionally no automatic Jira retry loop in V1. A timeout or Jira error is recorded as `FAILED`, which avoids accidental duplicate issues or uncontrolled API usage on the free plan.
 
 ## Local development and tests
 
@@ -176,5 +192,11 @@ Inspect every generated migration before applying it. Files under `db/postgres/`
 | `REDIS_URL` | set by Compose | Redis connection URL |
 | `MONITOR_INTERVAL_SECONDS` | `60` | Automatic check interval |
 | `SLACK_WEBHOOK_URL` | empty | Optional Slack incoming webhook |
+| `JIRA_INTEGRATION_ENABLED` | `false` | Enables Jira issue creation when set to `true` |
+| `JIRA_BASE_URL` | empty | Jira site URL, such as `https://example.atlassian.net` |
+| `JIRA_EMAIL` | empty | Atlassian account email used by the integration |
+| `JIRA_API_TOKEN` | empty | Secret Jira API token; never commit it |
+| `JIRA_PROJECT_KEY` | `KAN` | Jira project receiving incidents |
+| `JIRA_ISSUE_TYPE` | `Task` | Jira issue type used for incidents |
 
 Never commit `.env` or webhook URLs.

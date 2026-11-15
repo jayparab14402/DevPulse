@@ -219,3 +219,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local/generated artifacts
+.DS_Store
+output/
+tmp/
+postman/
