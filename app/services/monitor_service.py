@@ -1,5 +1,6 @@
-from ..models import Monitor, MonitorCheck
-from sqlalchemy import Select
+from sqlalchemy import select
+
+from ..models import Monitor
 
 '''
 {
@@ -11,15 +12,12 @@ from sqlalchemy import Select
 }
 '''
 def get_monitor_rec(session, ref_id):
-    query = Select(Monitor).where(Monitor.id == ref_id)
-    sess_query = session.scalars(query).first()
-    print(sess_query)
-    return sess_query
+    query = select(Monitor).where(Monitor.id == ref_id)
+    return session.scalars(query).first()
 
 
 def create_monitior_service(req, session):
     try:
-        print("INSIDE create_monitior_service")
         body = Monitor(
             name=req.name,
             url=req.url,
@@ -28,15 +26,10 @@ def create_monitior_service(req, session):
             timeout_seconds=req.timeout_seconds
         )
         session.add(body)
-        print("ADDED")
-
         session.commit()
-        print("COMMITED")
-
         session.refresh(body)
-        print("REFRESHED")
         return get_monitor_rec(session, body.id)
-    except Exception as e:
+    except Exception:
         session.rollback()
-        print("Error", e)
+        raise
 
