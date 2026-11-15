@@ -9,6 +9,8 @@ services:
     environment:
       ENGINE: "postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}"
       REDIS_URL: "redis://redis:6379/0"
+      MONITOR_INTERVAL_SECONDS: "${MONITOR_INTERVAL_SECONDS:-60}"
+      SLACK_WEBHOOK_URL: "${SLACK_WEBHOOK_URL:-}"
 
     depends_on:
       postgres:

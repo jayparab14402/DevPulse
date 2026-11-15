@@ -1,43 +1,34 @@
-import json
 import os
-import time
 
 import redis
-import requests
 from dotenv import load_dotenv
-from .services.incident_service import handle_incident
+
 
 load_dotenv()
 
-REDIS_URL = os.environ["REDIS_URL"]
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+FAILURE_WINDOW_SECONDS = 300
 
 redis_client = redis.Redis.from_url(
     REDIS_URL,
-    decode_responses=True
+    decode_responses=True,
 )
 
 
-def register_failure(monitor_id):
+def failure_key(monitor_id: int) -> str:
+    return f"monitor:{monitor_id}:failures"
+
+
+def register_failure(monitor_id: int) -> int | None:
+    """Increment and return a monitor's failure count for the active window."""
     try:
-        key = f"monitors:{monitor_id}:failures"
+        key = failure_key(monitor_id)
+        count = redis_client.incr(key)
 
-        redis_client.incr(key)
+        if count == 1:
+            redis_client.expire(key, FAILURE_WINDOW_SECONDS)
 
-        count = redis_client.get(key)
-
-        res = handle_incident(conn, monitor_id, count)
-
-        if int(count) == 3:
-            redis_client.expire(key, 300)
-
-
-
-    except redis.RedisError as e:
-        print(f"Redis error: {e}")
-
-
-register_failure(12)
-
-
-
-print(redis_client.ping())
+        return count
+    except redis.RedisError as exc:
+        print(f"Redis error while registering monitor failure: {exc}")
+        return None

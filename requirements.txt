@@ -1,4 +1,5 @@
 agent-detector==2.0.0
+APScheduler==3.11.3
 alembic==1.20.1
 annotated-doc==0.0.5
 annotated-types==0.8.0
@@ -47,6 +48,7 @@ python-dotenv==1.2.4
 python-multipart==0.0.33
 PyYAML==6.0.3
 requests==2.34.2
+redis==8.1.0
 rich==15.0.0
 rich-toolkit==0.20.6
 rignore==0.8.1

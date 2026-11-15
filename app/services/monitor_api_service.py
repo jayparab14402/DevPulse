@@ -1,84 +1,80 @@
-
-from traceback import format_exc
-from sqlalchemy import Select
-from ..models import Monitor, MonitorCheck
-import requests
 import time
+
+import requests
 from fastapi import HTTPException
+from sqlalchemy import select
+
+from ..enums import MonitorStatus
+from ..models import Monitor, MonitorCheck
 from ..redis_client import register_failure
+from .incident_service import handle_incident
+from .slack_service import send_incident_alert
 
-def call_monitor_api_service(session, ref_id):
 
+def _save_check(session, check: MonitorCheck) -> MonitorCheck:
+    session.add(check)
+    session.commit()
+    session.refresh(check)
+    return check
+
+
+def _process_failure(session, check: MonitorCheck) -> None:
+    failure_count = register_failure(check.monitor_id)
+    if failure_count is None:
+        return
+
+    incident, created = handle_incident(
+        session,
+        check.monitor_id,
+        failure_count,
+    )
+    if created:
+        send_incident_alert(incident)
+
+
+def call_monitor_api_service(session, monitor_id: int) -> MonitorCheck:
+    monitor = session.scalars(
+        select(Monitor).where(Monitor.id == monitor_id)
+    ).first()
+    if monitor is None:
+        raise HTTPException(status_code=404, detail="Monitor not found")
+
+    start = time.perf_counter()
     try:
-        obj = Select(Monitor).where(Monitor.id == ref_id)
-        query = session.scalars(obj).first()
-        if not query:
-            raise HTTPException(
-                status_code=404,
-                detail="Monitor not found"
-            )
-        db_url = query.url
-        db_timeout = query.timeout_seconds
-
-        start = time.perf_counter()
-        call = requests.get(url=db_url, timeout=db_timeout)
-        end = time.perf_counter()
-        elapsed_time = (end - start) * 1000
-        elapsed_time_in_ms = elapsed_time
-        resp = call.json()
-        resp_status_code = call.status_code
-        data = MonitorCheck(
-            monitor_id = query.id,
-            status = "UP" if resp_status_code == query.expected_status else "DOWN",
-            http_status = resp_status_code,
-            latency_ms = elapsed_time_in_ms,    
+        response = requests.request(
+            method=monitor.method,
+            url=monitor.url,
+            timeout=monitor.timeout_seconds,
         )
-        session.add(data)
-        session.commit()
-        session.refresh(data)
-        print(f"((((((((((((((((((((({data.status})))))))))))))))))))))")
-
-        if data.status != "UP":
-            register_failure(data.monitor_id)
-        return {
-            "id": data.id,
-            "monitor_id": data.monitor_id,
-            "status": data.status,
-            "http_status": data.http_status,
-            "latency_ms": data.latency_ms,
-            "error_message": data.error_message,
-            "checked_at": data.checked_at
-
-        }
-        # print("--------------------------------------------------", data)
-    except requests.RequestException as e:
-        elapsed_time_ms = (time.perf_counter() - start) * 1000
-
-        data = MonitorCheck(
-            monitor_id=query.id,
-            status="DOWN",
-            http_status=None,
-            latency_ms=elapsed_time_ms,
-            error_message=str(e)
+        latency_ms = (time.perf_counter() - start) * 1000
+        status = (
+            MonitorStatus.UP
+            if response.status_code == monitor.expected_status
+            else MonitorStatus.DOWN
         )
-        register_failure(data.monitor_id)
+        check = _save_check(
+            session,
+            MonitorCheck(
+                monitor_id=monitor.id,
+                status=status,
+                http_status=response.status_code,
+                latency_ms=latency_ms,
+            ),
+        )
+    except requests.RequestException as exc:
+        latency_ms = (time.perf_counter() - start) * 1000
+        check = _save_check(
+            session,
+            MonitorCheck(
+                monitor_id=monitor.id,
+                status=MonitorStatus.DOWN,
+                http_status=None,
+                latency_ms=latency_ms,
+                error_message=str(exc),
+            ),
+        )
 
-        session.add(data)
-        session.commit()
-        session.refresh(data)
+    if check.status == MonitorStatus.DOWN:
+        _process_failure(session, check)
 
-        return data
-    
-    except Exception as e:
-        return {
-                    "id": data.id,
-                    "monitor_id": data.monitor_id,
-                    "status": None,
-                    "http_status": None,
-                    "latency_ms": data.latency_ms,
-                    "error_message": str(e),
-                    "checked_at": data.checked_at
-        
-                }
-        print(f"Error in call_monitor_api_service {e}")
-
+    return check
