@@ -45,6 +45,7 @@ def handle_incident(session, monitor_id: int, failure_count: int):
 
 def resolve_incident(session, incident_id: int):
     incident = session.scalars(
+        
         select(Incident).where(
             Incident.id == incident_id,
             Incident.status == IncidentStatus.OPEN,
