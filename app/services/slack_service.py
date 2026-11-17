@@ -18,6 +18,7 @@ def send_incident_alert(incident: Incident) -> bool:
         f"Failures: {incident.failure_count}\n"
         f"Status: {incident.status.value}"
     )
+    
 
     try:
         response = requests.post(webhook_url, json={"text": message}, timeout=5)
