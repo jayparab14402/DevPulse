@@ -20,7 +20,7 @@ def failure_key(monitor_id: int) -> str:
 
 
 def register_failure(monitor_id: int) -> int | None:
-    """Increment and return a monitor's failure count for the active window."""
+    """Increment and return a monitor's failure count for the active window. """
     try:
         key = failure_key(monitor_id)
         count = redis_client.incr(key)
